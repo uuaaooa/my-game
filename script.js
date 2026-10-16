@@ -16,15 +16,14 @@ const judgmentHeight = 50; // 회색 판정 줄의 세로 크기입니다.
 
 const playerWidth = 30; // 플레이어의 가로 크기입니다.
 const playerHeight = 30; // 플레이어의 세로 크기입니다.
-const playerX = (screenWidth - playerWidth) / 2; // 플레이어를 화면 가로 가운데에 놓습니다.
+const playerX = laneWidth * 2.5 - playerWidth / 2; // 플레이어를 세 번째 레인의 가로 가운데에 놓습니다.
 const playerY = judgmentY + (judgmentHeight - playerHeight) / 2; // 플레이어를 판정 줄 높이의 가운데에 놓습니다.
 
 const noteWidth = laneWidth; // 초록 노트의 양옆이 레인의 검은 경계선에 닿도록 너비를 맞춥니다.
 const noteHeight = 20; // 초록 노트의 높이를 줄여 납작하게 만듭니다.
-const notes = [ // 각 노트의 왼쪽 위 좌표입니다. 항목을 추가하면 노트가 늘어납니다.
-  { x: laneWidth * 0.5 - noteWidth / 2, y: 150 }, // 첫 번째 레인의 노트입니다.
-  { x: laneWidth * 2.5 - noteWidth / 2, y: 320 }, // 세 번째 레인의 노트입니다.
-  { x: laneWidth * 4.5 - noteWidth / 2, y: 220 }, // 다섯 번째 레인의 노트입니다.
+const notes = [ // 노트 두 개의 위치 목록입니다.
+  { x: laneWidth * 0.5 - noteWidth / 2, y: 60 }, // 첫 번째 레인의 위쪽에 노트를 놓습니다. y가 작을수록 높아집니다.
+  { x: laneWidth * 2.5 - noteWidth / 2, y: (screenHeight - noteHeight) / 2 }, // 세 번째 레인의 가로·세로 가운데에 노트를 놓습니다.
 ];
 
 // ===== 배경: 화면 전체를 흰색으로 채웁니다. =====
@@ -54,6 +53,6 @@ for (const note of notes) {
   ctx.fillRect(note.x, note.y, noteWidth, noteHeight);
 }
 
-// ===== 플레이어: 화면 아래 가운데에 파란 사각형을 그립니다. =====
+// ===== 플레이어: 세 번째 레인의 회색 판정 줄 가운데에 파란 사각형을 그립니다. =====
 ctx.fillStyle = "blue";
 ctx.fillRect(playerX, playerY, playerWidth, playerHeight);

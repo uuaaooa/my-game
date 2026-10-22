@@ -1,58 +1,93 @@
-const canvas = document.getElementById("game"); // 게임 캔버스를 가져옵니다.
-const ctx = canvas.getContext("2d"); // 2D 그림을 그리는 도구를 가져옵니다.
+﻿const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-// ===== 좌표와 크기 설정: 이 부분의 값을 바꾸면 화면 배치를 바꿀 수 있습니다. =====
-// x는 왼쪽에서부터의 거리, y는 위쪽에서부터의 거리입니다. 단위는 픽셀입니다.
-const screenWidth = 800; // 게임 화면의 가로 크기입니다.
-const screenHeight = 600; // 게임 화면의 세로 크기입니다.
-const laneCount = 6; // 레인 수입니다. 세로 구분선은 이보다 하나 적게 그립니다.
-const laneWidth = screenWidth / laneCount; // 레인 하나의 너비를 자동으로 계산합니다.
-const dividerWidth = 2; // 검은 세로 구분선의 두께입니다.
+// ===== 화면과 고정된 물체의 위치, 크기 =====
+const screenWidth = 800;
+const screenHeight = 600;
+const laneCount = 6;
+const laneWidth = screenWidth / laneCount;
+const dividerWidth = 2;
 
-const judgmentX = 0; // 회색 판정 줄의 왼쪽 위치입니다.
-const judgmentY = 500; // 회색 판정 줄의 위쪽 위치입니다.
-const judgmentWidth = screenWidth; // 회색 판정 줄의 가로 크기입니다.
-const judgmentHeight = 50; // 회색 판정 줄의 세로 크기입니다.
+const judgmentX = 0;
+const judgmentY = 500;
+const judgmentWidth = screenWidth;
+const judgmentHeight = 50;
 
-const playerWidth = 30; // 플레이어의 가로 크기입니다.
-const playerHeight = 30; // 플레이어의 세로 크기입니다.
-const playerX = laneWidth * 2.5 - playerWidth / 2; // 플레이어를 세 번째 레인의 가로 가운데에 놓습니다.
-const playerY = judgmentY + (judgmentHeight - playerHeight) / 2; // 플레이어를 판정 줄 높이의 가운데에 놓습니다.
+// ===== 플레이어의 위치, 크기, 속도 =====
+const playerWidth = 30;
+const playerHeight = 30;
+let playerX = laneWidth * 2.5 - playerWidth / 2;
+const playerY = judgmentY + (judgmentHeight - playerHeight) / 2;
+let playerSpeedX = 3; // 프레임마다 이동할 거리입니다. 양수는 오른쪽, 음수는 왼쪽입니다.
 
-const noteWidth = laneWidth; // 초록 노트의 양옆이 레인의 검은 경계선에 닿도록 너비를 맞춥니다.
-const noteHeight = 20; // 초록 노트의 높이를 줄여 납작하게 만듭니다.
-const notes = [ // 노트 두 개의 위치 목록입니다.
-  { x: laneWidth * 0.5 - noteWidth / 2, y: 60 }, // 첫 번째 레인의 위쪽에 노트를 놓습니다. y가 작을수록 높아집니다.
-  { x: laneWidth * 2.5 - noteWidth / 2, y: (screenHeight - noteHeight) / 2 }, // 세 번째 레인의 가로·세로 가운데에 노트를 놓습니다.
-];
+// ===== 노트의 위치, 크기, 속도 =====
+const noteWidth = laneWidth;
+const noteHeight = 20;
+const notes = [
+  { x: 0, y: 60, speedY: 2 }, // 첫 번째 레인에서 아래로 떨어지는 노트입니다.
+  { x: laneWidth * 2, y: (screenHeight - noteHeight) / 2, speedY: 3 },
+]; // 각 노트의 speedY를 바꾸면 떨어지는 속도가 달라집니다.
 
-// ===== 배경: 화면 전체를 흰색으로 채웁니다. =====
-canvas.width = screenWidth; // 설정한 가로 크기를 캔버스에 적용합니다.
-canvas.height = screenHeight; // 설정한 세로 크기를 캔버스에 적용합니다.
-ctx.fillStyle = "white";
-ctx.fillRect(0, 0, screenWidth, screenHeight);
+canvas.width = screenWidth;
+canvas.height = screenHeight;
 
-// ===== 판정 줄: 화면 아래쪽에 긴 회색 줄을 그립니다. =====
-ctx.fillStyle = "#aaa";
-ctx.fillRect(judgmentX, judgmentY, judgmentWidth, judgmentHeight);
+function gameLoop() {
+  // ===== 1. 지우기: 이전 프레임의 그림을 지웁니다. =====
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-// ===== 레인 구분선: 위에서 아래까지 검은 세로선을 그립니다. =====
-ctx.strokeStyle = "black";
-ctx.lineWidth = dividerWidth;
-for (let i = 1; i < laneCount; i++) {
-  const x = laneWidth * i; // 레인 너비를 기준으로 각 구분선의 위치를 계산합니다.
-  ctx.beginPath();
-  ctx.moveTo(x, 0);
-  ctx.lineTo(x, screenHeight);
-  ctx.stroke();
+  // ===== 2. 계산: 플레이어와 노트의 위치를 바꿉니다. =====
+  playerX += playerSpeedX;
+
+  // 플레이어가 좌우 끝에 닿으면 화면 안에 맞추고 방향을 뒤집습니다.
+  if (playerX + playerWidth >= canvas.width) {
+    playerX = canvas.width - playerWidth;
+    playerSpeedX = -Math.abs(playerSpeedX);
+  } else if (playerX <= 0) {
+    playerX = 0;
+    playerSpeedX = Math.abs(playerSpeedX);
+  }
+
+  for (const note of notes) {
+    note.y += note.speedY; // y가 커질수록 화면 아래로 움직입니다.
+
+    // 노트 전체가 화면 아래로 사라지면 화면 위에서 다시 떨어집니다.
+    if (note.y >= canvas.height) {
+      note.y = -noteHeight;
+    }
+  }
+
+  // ===== 3. 그리기: 배경과 물체를 새 위치에 다시 그립니다. =====
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 화면 아래쪽의 회색 판정 줄을 그립니다.
+  ctx.fillStyle = "#aaa";
+  ctx.fillRect(judgmentX, judgmentY, judgmentWidth, judgmentHeight);
+
+  // 여섯 레인을 나누는 검은 세로선을 그립니다.
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = dividerWidth;
+  for (let i = 1; i < laneCount; i++) {
+    const x = laneWidth * i;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+
+  // 초록 노트 두 개를 그립니다.
+  ctx.fillStyle = "green";
+  for (const note of notes) {
+    ctx.fillRect(note.x, note.y, noteWidth, noteHeight);
+  }
+
+  // 회색 판정 줄 위에서 좌우로 움직이는 파란 플레이어를 그립니다.
+  ctx.fillStyle = "blue";
+  ctx.fillRect(playerX, playerY, playerWidth, playerHeight);
+
+  // 다음 화면 갱신 시점에 이 함수를 다시 실행하도록 예약합니다.
+  requestAnimationFrame(gameLoop);
 }
 
-// ===== 노트: 각 레인의 너비에 맞춘 납작한 초록 사각형을 그립니다. =====
-ctx.fillStyle = "green";
-for (const note of notes) {
-  ctx.fillRect(note.x, note.y, noteWidth, noteHeight);
-}
-
-// ===== 플레이어: 세 번째 레인의 회색 판정 줄 가운데에 파란 사각형을 그립니다. =====
-ctx.fillStyle = "blue";
-ctx.fillRect(playerX, playerY, playerWidth, playerHeight);
+// 첫 프레임을 예약해서 게임 루프를 시작합니다.
+requestAnimationFrame(gameLoop);

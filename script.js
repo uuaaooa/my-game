@@ -13,12 +13,15 @@ const judgmentY = 500;
 const judgmentWidth = screenWidth;
 const judgmentHeight = 50;
 
-// ===== 플레이어의 위치, 크기, 속도 =====
+// ===== 플레이어의 위치, 크기, 이동 속도 =====
 const playerWidth = 30;
 const playerHeight = 30;
+const playerSpeed = 8; // 매 프레임 이동할 거리(픽셀)입니다.
 let playerX = laneWidth * 2.5 - playerWidth / 2;
-const playerY = judgmentY + (judgmentHeight - playerHeight) / 2;
-let playerSpeedX = 3; // 프레임마다 이동할 거리입니다. 양수는 오른쪽, 음수는 왼쪽입니다.
+let playerY = judgmentY + (judgmentHeight - playerHeight) / 2;
+
+// 누르고 있는 키는 true, 뗀 키는 false로 기록합니다.
+const keys = {};
 
 // ===== 노트의 위치, 크기, 속도 =====
 const noteWidth = laneWidth;
@@ -36,16 +39,15 @@ function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // ===== 2. 계산: 플레이어와 노트의 위치를 바꿉니다. =====
-  playerX += playerSpeedX;
+  // 각 방향을 따로 확인하므로 두 키를 함께 누르면 대각선으로 이동합니다.
+  if (keys.ArrowLeft) playerX -= playerSpeed;
+  if (keys.ArrowRight) playerX += playerSpeed;
+  //if (keys.ArrowUp) playerY -= playerSpeed;
+  //if (keys.ArrowDown) playerY += playerSpeed;
 
-  // 플레이어가 좌우 끝에 닿으면 화면 안에 맞추고 방향을 뒤집습니다.
-  if (playerX + playerWidth >= canvas.width) {
-    playerX = canvas.width - playerWidth;
-    playerSpeedX = -Math.abs(playerSpeedX);
-  } else if (playerX <= 0) {
-    playerX = 0;
-    playerSpeedX = Math.abs(playerSpeedX);
-  }
+  // 플레이어 크기를 고려하여 네 벽 밖으로 나가지 않게 막습니다.
+  playerX = Math.max(0, Math.min(playerX, canvas.width - playerWidth));
+  playerY = Math.max(0, Math.min(playerY, canvas.height - playerHeight));
 
   for (const note of notes) {
     note.y += note.speedY; // y가 커질수록 화면 아래로 움직입니다.
@@ -81,7 +83,7 @@ function gameLoop() {
     ctx.fillRect(note.x, note.y, noteWidth, noteHeight);
   }
 
-  // 회색 판정 줄 위에서 좌우로 움직이는 파란 플레이어를 그립니다.
+  // 방향키와 마우스로 움직이는 파란 플레이어를 그립니다.
   ctx.fillStyle = "blue";
   ctx.fillRect(playerX, playerY, playerWidth, playerHeight);
 
@@ -91,3 +93,43 @@ function gameLoop() {
 
 // 첫 프레임을 예약해서 게임 루프를 시작합니다.
 requestAnimationFrame(gameLoop);
+
+// 키를 누를 때마다 눌린 키 이름을 콘솔에 출력합니다.
+// document.addEventListener("keydown", (event) => {
+//   console.log(event.key);
+// });
+
+// 방향키와 스페이스바의 기본 동작인 페이지 스크롤을 막습니다.
+function preventGameKeyScroll(event) {
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(event.key)) {
+    event.preventDefault();
+  }
+}
+
+// 이벤트에서는 키 상태만 기록하고, 실제 이동은 게임 루프에서 계산합니다.
+document.addEventListener("keydown", (event) => {
+  preventGameKeyScroll(event);
+  keys[event.key] = true;
+});
+
+document.addEventListener("keyup", (event) => {
+  preventGameKeyScroll(event);
+  keys[event.key] = false;
+});
+
+// 게임 화면의 왼쪽/오른쪽 절반을 클릭하면 해당 방향으로 한 칸 이동합니다.
+canvas.addEventListener("click", (event) => {
+  const bounds = canvas.getBoundingClientRect();
+  const direction = event.clientX < bounds.left + bounds.width / 2 ? -1 : 1;
+  playerX += direction * laneWidth;
+
+  // 플레이어의 크기를 고려하여 화면 양옆을 벗어나지 않게 막습니다.
+  playerX = Math.max(0, Math.min(playerX, canvas.width - playerWidth));
+});
+
+// 창을 벗어났을 때 키가 계속 눌린 상태로 남지 않게 초기화합니다.
+window.addEventListener("blur", () => {
+  for (const key in keys) {
+    keys[key] = false;
+  }
+});

@@ -8,6 +8,23 @@ const laneCount = 6;
 const laneWidth = screenWidth / laneCount;
 const dividerWidth = 2;
 
+// ===== 적의 개수와 크기: 이 값을 바꾸면 한꺼번에 조절할 수 있습니다. =====
+const enemyCount = 3;
+const enemySize = 30;
+const itemScore = 10; // 아이템 하나를 먹으면 얻는 점수입니다.
+let score = 0;
+const maxMisses = 20; // 이 개수만큼 노트를 놓치면 게임이 끝납니다.
+let missedCount = 0;
+let isGameOver = false;
+
+// 게임이 끝났을 때만 보여 줄 재시작 버튼입니다.
+const restartButton = document.createElement("button");
+restartButton.id = "restart-button";
+restartButton.textContent = "재시작";
+restartButton.hidden = true;
+canvas.insertAdjacentElement("afterend", restartButton);
+restartButton.addEventListener("click", restartGame);
+
 const judgmentX = 0;
 const judgmentY = 500;
 const judgmentWidth = screenWidth;
@@ -23,22 +40,38 @@ let playerY = judgmentY + (judgmentHeight - playerHeight) / 2;
 // 누르고 있는 키는 true, 뗀 키는 false로 기록합니다.
 const keys = {};
 
-// ===== 노트의 위치, 크기, 속도 =====
-const noteWidth = laneWidth;
-const noteHeight = 20;
-const notes = [
-  { x: 0, y: 60, speedY: 2 }, // 첫 번째 레인에서 아래로 떨어지는 노트입니다.
-  { x: laneWidth * 2, y: (screenHeight - noteHeight) / 2, speedY: 3 },
-]; // 각 노트의 speedY를 바꾸면 떨어지는 속도가 달라집니다.
+// 각 적의 위치, 속도, 크기를 객체로 묶어서 배열에 담습니다.
+const enemies = [];
+function resetNotes() {
+  enemies.length = 0;
+  for (let i = 0; i < enemyCount; i++) {
+    enemies.push({
+      x: Math.floor((i * laneCount) / enemyCount) * laneWidth,
+      y: -enemySize,
+      speed: 2 + i, // 처음에는 각각 2, 3, 4의 속도로 떨어집니다.
+      size: enemySize,
+    });
+  }
+}
+resetNotes();
+
+// 점수, 입력 상태, 플레이어와 노트를 모두 처음 상태로 되돌립니다.
+function restartGame() {
+  score = 0;
+  missedCount = 0;
+  isGameOver = false;
+  playerX = laneWidth * 2.5 - playerWidth / 2;
+  playerY = judgmentY + (judgmentHeight - playerHeight) / 2;
+  for (const key in keys) keys[key] = false;
+  resetNotes();
+  restartButton.hidden = true;
+}
 
 canvas.width = screenWidth;
 canvas.height = screenHeight;
 
-function gameLoop() {
-  // ===== 1. 지우기: 이전 프레임의 그림을 지웁니다. =====
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // ===== 2. 계산: 플레이어와 노트의 위치를 바꿉니다. =====
+function updateGame() {
+  // ===== 2. 계산: 플레이어와 적의 위치를 바꿉니다. =====
   // 각 방향을 따로 확인하므로 두 키를 함께 누르면 대각선으로 이동합니다.
   if (keys.ArrowLeft) playerX -= playerSpeed;
   if (keys.ArrowRight) playerX += playerSpeed;
@@ -49,14 +82,51 @@ function gameLoop() {
   playerX = Math.max(0, Math.min(playerX, canvas.width - playerWidth));
   playerY = Math.max(0, Math.min(playerY, canvas.height - playerHeight));
 
-  for (const note of notes) {
-    note.y += note.speedY; // y가 커질수록 화면 아래로 움직입니다.
+  // 뒤에서부터 확인하면 아이템을 제거해도 다른 아이템을 건너뛰지 않습니다.
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const enemy = enemies[i];
+    enemy.y += enemy.speed; // y가 커질수록 화면 아래로 움직입니다.
 
-    // 노트 전체가 화면 아래로 사라지면 화면 위에서 다시 떨어집니다.
-    if (note.y >= canvas.height) {
-      note.y = -noteHeight;
+    // 초록색 물체를 아이템으로 사용하며, 실제 그리는 가로 폭으로 접촉을 확인합니다.
+    const isTouching =
+      playerX <= enemy.x + laneWidth &&
+      playerX + playerWidth >= enemy.x &&
+      playerY <= enemy.y + enemy.size &&
+      playerY + playerHeight >= enemy.y;
+
+    if (isTouching) {
+      score += itemScore;
+      enemies.splice(i, 1); // 닿은 아이템 객체를 배열에서 제거합니다.
+      // 같은 속도와 크기의 새 아이템을 화면 위쪽의 랜덤한 칸에 만듭니다.
+      enemies.push({
+        x: Math.floor(Math.random() * laneCount) * laneWidth,
+        y: -enemy.size,
+        speed: enemy.speed,
+        size: enemy.size,
+      });
+      continue;
+    }
+
+    // 적 전체가 화면 아래로 사라지면 위쪽의 랜덤한 칸에서 다시 떨어집니다.
+    if (enemy.y >= canvas.height) {
+      missedCount += 1;
+      if (missedCount >= maxMisses) {
+        isGameOver = true;
+        restartButton.hidden = false;
+        return; // 게임이 끝난 프레임부터 나머지 이동과 판정을 멈춥니다.
+      }
+      enemy.x = Math.floor(Math.random() * laneCount) * laneWidth;
+      enemy.y = -enemy.size;
     }
   }
+}
+
+function gameLoop() {
+  // 게임 오버 상태에서는 위치와 점수를 갱신하지 않습니다.
+  if (!isGameOver) updateGame();
+
+  // 이전 프레임의 그림을 지웁니다.
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // ===== 3. 그리기: 배경과 물체를 새 위치에 다시 그립니다. =====
   ctx.fillStyle = "white";
@@ -77,15 +147,35 @@ function gameLoop() {
     ctx.stroke();
   }
 
-  // 초록 노트 두 개를 그립니다.
+  // 적의 가로는 한 칸 전체를 채우고, 세로는 각 객체의 크기로 그립니다.
   ctx.fillStyle = "green";
-  for (const note of notes) {
-    ctx.fillRect(note.x, note.y, noteWidth, noteHeight);
+  for (const enemy of enemies) {
+    ctx.fillRect(enemy.x, enemy.y, laneWidth, enemy.size);
   }
 
   // 방향키와 마우스로 움직이는 파란 플레이어를 그립니다.
   ctx.fillStyle = "blue";
   ctx.fillRect(playerX, playerY, playerWidth, playerHeight);
+
+  // 다른 물체 위에 점수를 그려서 왼쪽 위에서 확인할 수 있게 합니다.
+  ctx.fillStyle = "black";
+  ctx.font = "24px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(`점수: ${score}`, 10, 10);
+  ctx.fillText(`놓친 노트: ${missedCount} / ${maxMisses}`, 10, 42);
+
+  if (isGameOver) {
+    // 멈춘 게임 화면 위에 게임 오버 안내를 표시합니다.
+    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "white";
+    ctx.font = "40px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("게임 오버", canvas.width / 2, canvas.height / 2 - 30);
+    ctx.font = "24px sans-serif";
+    ctx.fillText(`최종 점수: ${score}`, canvas.width / 2, canvas.height / 2 + 25);
+  }
 
   // 다음 화면 갱신 시점에 이 함수를 다시 실행하도록 예약합니다.
   requestAnimationFrame(gameLoop);
@@ -119,6 +209,7 @@ document.addEventListener("keyup", (event) => {
 
 // 게임 화면의 왼쪽/오른쪽 절반을 클릭하면 해당 방향으로 한 칸 이동합니다.
 canvas.addEventListener("click", (event) => {
+  if (isGameOver) return;
   const bounds = canvas.getBoundingClientRect();
   const direction = event.clientX < bounds.left + bounds.width / 2 ? -1 : 1;
   playerX += direction * laneWidth;

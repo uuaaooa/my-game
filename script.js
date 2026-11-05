@@ -31,7 +31,7 @@ const judgmentWidth = screenWidth;
 const judgmentHeight = 50;
 
 // ===== 플레이어의 위치, 크기, 이동 속도 =====
-const playerWidth = 30;
+const playerWidth = 28;
 const playerHeight = 30;
 const playerSpeed = 8; // 매 프레임 이동할 거리(픽셀)입니다.
 let playerX = laneWidth * 2.5 - playerWidth / 2;
